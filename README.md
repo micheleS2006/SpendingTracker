@@ -32,13 +32,14 @@ Frontend preview: https://spending-tracker-m.netlify.app
 
 ## Screenshots
 
-Add your screenshots here:
-
-```md
+### Dashboard
 ![Dashboard](screenshots/dashboard.png)
+
+### Transactions
 ![Transactions](screenshots/transactions.png)
+
+### Categories
 ![Categories](screenshots/categories.png)
-```
 
 ## Project Structure
 
