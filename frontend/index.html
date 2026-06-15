@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spending Tracker</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="icon" type="image/png" href="images/logo.png" />
+  </head>
+  <body>
+    <div class="app">
+      <!--  SIDEBAR  -->
+      <aside class="sidebar">
+        <div class="sidebar-logo">Spending Tracker</div>
+
+        <button class="nav-item active" data-page="overview">
+          <!--Selected button when page loads-->
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+          </svg>
+          Overview
+        </button>
+        <button class="nav-item" data-page="transactions">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M3 12h18M3 6h18M3 18h18" />
+          </svg>
+          <!--Icon for the elementso-->
+          Transactions
+        </button>
+        <button class="nav-item" data-page="categories">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+          </svg>
+          Categories
+        </button>
+      </aside>
+
+      <!-- MAIN -->
+      <main class="main">
+        <!-- OVERVIEW PAGE -->
+        <div class="page active" id="page-overview">
+          <div class="logo-container">
+            <img
+              src="images/logo.png"
+              alt="Spending Tracker Logo"
+              class="main-logo"
+            />
+            <h1>Spending Tracker</h1>
+          </div>
+
+          <div class="upload-card">
+            <input
+              type="file"
+              id="pdf-upload"
+              accept="application/pdf"
+              style="display: none"
+              onchange="uploadPDF(event)"
+            />
+            <!-- accept ?????-->
+
+            <div class="upload-row">
+              <button
+                class="btn-dark"
+                onclick="document.getElementById('pdf-upload').click()"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Upload PDF
+              </button>
+
+              <button class="btn-outline" onclick="clearAll()">
+                Clear all data
+              </button>
+            </div>
+
+            <p class="upload-hint">PDF support: RBC statements only for now.</p>
+
+            <div class="success-msg" id="import-msg" style="display: none">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <span id="import-text"></span>
+            </div>
+          </div>
+
+          <div class="filters-wrap">
+            <div class="section-head">
+              <div class="section-bar"></div>
+              <h2>Filters</h2>
+            </div>
+            <div class="filter-row">
+              <div class="filter-group">
+                <span class="filter-label">Start date</span>
+                <input
+                  type="date"
+                  class="filter-input"
+                  id="filter-start"
+                  onchange="applyFilters()"
+                />
+              </div>
+              <div class="filter-group">
+                <span class="filter-label">End date</span>
+                <input
+                  type="date"
+                  class="filter-input"
+                  id="filter-end"
+                  onchange="applyFilters()"
+                />
+              </div>
+              <div class="filter-group">
+                <span class="filter-label">Category</span>
+                <select
+                  class="filter-select"
+                  id="filter-cat"
+                  onchange="applyFilters()"
+                >
+                  <option value="">All categories</option>
+                  <option value="Food & dining">Food & dining</option>
+                  <option value="Shopping">Shopping</option>
+                  <option value="Transport">Transport</option>
+                  <option value="Entertainment">Entertainment</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <button class="btn-reset" onclick="resetFilters()">
+                Reset filters
+              </button>
+            </div>
+          </div>
+
+          <div class="summary-wrap">
+            <div class="section-head">
+              <div class="section-bar"></div>
+              <h2>Spending summary</h2>
+            </div>
+            <div class="total-banner">
+              <span class="lbl">Total spent</span>
+              <span class="amt" id="total-amt">$0.00</span>
+            </div>
+            <div class="cat-grid" id="cat-grid"></div>
+          </div>
+
+          <div class="chart-wrap">
+            <div class="section-head">
+              <div class="section-bar"></div>
+              <h2>Breakdown</h2>
+            </div>
+            <div class="chart-card">
+              <div class="chart-canvas-wrap">
+                <canvas id="pie-chart"></canvas>
+              </div>
+              <div class="chart-legend" id="chart-legend"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRANSACTIONS PAGE -->
+        <div class="page" id="page-transactions">
+          <h1 class="page-title">Transactions</h1>
+          <div class="tx-top">
+            <div class="section-head" style="margin-bottom: 0">
+              <div class="section-bar"></div>
+              <h2 id="tx-count">All transactions</h2>
+            </div>
+            <button class="btn-outline">Export CSV</button>
+            <button class="btn-add" onclick="openModal()">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add transaction
+            </button>
+          </div>
+          <div class="tx-card">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Category</th>
+                  <th style="text-align: right">Amount</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tx-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- CATEGORIES PAGE -->
+        <div class="page" id="page-categories">
+          <h1 class="page-title">Categories</h1>
+          <div class="section-head">
+            <div class="section-bar"></div>
+            <h2>Spending by category</h2>
+          </div>
+          <div class="cat-page-grid" id="cat-page-grid"></div>
+          <div class="chart-wrap">
+            <div class="section-head">
+              <div class="section-bar"></div>
+              <h2>Breakdown</h2>
+            </div>
+            <div class="chart-card">
+              <div class="chart-canvas-wrap">
+                <canvas id="pie-chart-2"></canvas>
+              </div>
+              <div class="chart-legend" id="chart-legend-2"></div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- MODAL -->
+    <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
+      <div class="modal">
+        <div class="modal-title">Add transaction</div>
+        <div class="modal-fields">
+          <div>
+            <label class="field-label">Description</label>
+            <input
+              type="text"
+              class="field-input"
+              id="f-desc"
+              placeholder="e.g. Tim Hortons"
+            />
+          </div>
+          <div>
+            <label class="field-label">Amount ($)</label>
+            <input
+              type="number"
+              class="field-input"
+              id="f-amt"
+              placeholder="0.00"
+              step="0.01"
+              min="0"
+            />
+          </div>
+          <div>
+            <label class="field-label">Category</label>
+            <select class="field-select" id="f-cat">
+              <option value="Food & dining">Food & dining</option>
+              <option value="Shopping">Shopping</option>
+              <option value="Transport">Transport</option>
+              <option value="Entertainment">Entertainment</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Date</label>
+            <input type="date" class="field-input" id="f-date" />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-outline" onclick="closeModal()">Cancel</button>
+          <button class="btn-dark" onclick="addTransaction()">Add</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
