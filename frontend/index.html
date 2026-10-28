@@ -9,9 +9,34 @@
   </head>
   <body>
     <div class="app">
+      <!-- MENU BUTTON: opens / closes the sidebar -->
+      <button
+        class="sidebar-toggle"
+        id="sidebar-toggle"
+        aria-label="Toggle menu"
+        aria-expanded="true"
+        onclick="toggleSidebar()"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      </button>
+
+      <!-- PHONE HEADER: a bar at the top on small screens, behind the menu button -->
+      <header class="mobile-header">
+        <img src="images/logo.png" alt="" class="mobile-header-logo" />
+        <span>Spending Tracker</span>
+      </header>
+
+      <!-- Dark background behind the sidebar on phones (click to close) -->
+      <div class="sidebar-overlay" onclick="toggleSidebar(false)"></div>
+
       <!--  SIDEBAR  -->
-      <aside class="sidebar">
-        <div class="sidebar-logo">Spending Tracker</div>
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+          <img src="images/logo.png" alt="" class="sidebar-logo-img" />
+          <span>Spending Tracker</span>
+        </div>
 
         <button class="nav-item active" data-page="overview">
           <!--Selected button when page loads-->
@@ -51,6 +76,17 @@
           </svg>
           Categories
         </button>
+        <button class="nav-item" data-page="assistant">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />
+          </svg>
+          Assistant
+        </button>
       </aside>
 
       <!-- MAIN -->
@@ -65,6 +101,39 @@
             />
             <h1>Spending Tracker</h1>
           </div>
+
+          <!-- WELCOME BANNER -->
+          <section class="welcome">
+            <div class="welcome-text">
+              <h2>Welcome! Let's make sense of your spending.</h2>
+              <p>
+                Upload a bank statement from any bank. AI reads it, sorts every
+                purchase into a category, and the assistant helps you find
+                where to save.
+              </p>
+            </div>
+            <ol class="welcome-steps">
+              <li>
+                <span class="step-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                </span>
+                <span><strong>Upload</strong> a PDF statement</span>
+              </li>
+              <li>
+                <span class="step-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg></span>
+                <span><strong>AI sorts</strong> your transactions</span>
+              </li>
+              <li>
+                <span class="step-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /></svg>
+                </span>
+                <span><strong>Ask</strong> the assistant how to save</span>
+              </li>
+            </ol>
+            <button class="btn-light" onclick="goToPage('assistant')">
+              Talk to the assistant
+            </button>
+          </section>
 
           <div class="upload-card">
             <input
@@ -96,12 +165,12 @@
                 Upload PDF
               </button>
 
-              <!-- <button class="btn-outline" onclick="clearAll()">
+              <button class="btn-danger" onclick="clearAll()">
                 Clear all data
-              </button> -->
+              </button>
             </div>
 
-            <p class="upload-hint">PDF support: RBC statements only for now.</p>
+            <p class="upload-hint" id="upload-hint">Works with any bank statement PDF.</p>
 
             <div class="success-msg" id="import-msg" style="display: none">
               <svg
@@ -125,6 +194,12 @@
               <h2>Filters</h2>
             </div>
             <div class="filter-row">
+              <div class="filter-group">
+                <span class="filter-label">Month</span>
+                <select class="filter-select" id="filter-month" onchange="pickMonth()">
+                  <option value="">All months</option>
+                </select>
+              </div>
               <div class="filter-group">
                 <span class="filter-label">Start date</span>
                 <input
@@ -170,22 +245,60 @@
               <h2>Spending summary</h2>
             </div>
             <div class="total-banner">
-              <span class="lbl">Total spent</span>
+              <span class="lbl" id="total-label">Total spent</span>
               <span class="amt" id="total-amt">$0.00</span>
             </div>
+
+            <!-- Income vs spent vs left (like a monthly budget sheet) -->
+            <div class="stat-row" id="stat-row">
+              <div class="stat-card">
+                <div class="stat-label">Income</div>
+                <div class="stat-value" id="stat-income">-</div>
+                <div class="stat-sub" id="stat-income-sub">Set it in My budget</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Spent</div>
+                <div class="stat-value" id="stat-spent">$0.00</div>
+                <div class="stat-sub" id="stat-spent-sub"></div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label" id="stat-left-label">Left</div>
+                <div class="stat-value" id="stat-left">-</div>
+                <div class="stat-sub" id="stat-left-sub"></div>
+              </div>
+            </div>
+
             <div class="cat-grid" id="cat-grid"></div>
           </div>
 
-          <div class="chart-wrap">
-            <div class="section-head">
-              <div class="section-bar"></div>
-              <h2>Breakdown</h2>
-            </div>
-            <div class="chart-card">
-              <div class="chart-canvas-wrap">
-                <canvas id="pie-chart"></canvas>
+          <div class="charts-grid">
+            <div class="chart-wrap">
+              <div class="section-head">
+                <div class="section-bar"></div>
+                <h2>Planned vs actual</h2>
               </div>
-              <div class="chart-legend" id="chart-legend"></div>
+              <div class="chart-card column">
+                <div class="bar-canvas-wrap">
+                  <canvas id="bar-chart"></canvas>
+                </div>
+                <p class="chart-note" id="bar-note">
+                  Set a monthly budget per category on the
+                  <a href="#" onclick="goToPage('categories'); return false;">Categories</a> page.
+                </p>
+              </div>
+            </div>
+
+            <div class="chart-wrap">
+              <div class="section-head">
+                <div class="section-bar"></div>
+                <h2>Spending breakdown</h2>
+              </div>
+              <div class="chart-card column">
+                <div class="donut-canvas-wrap">
+                  <canvas id="pie-chart"></canvas>
+                </div>
+                <div class="chart-legend" id="chart-legend"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -198,7 +311,7 @@
               <div class="section-bar"></div>
               <h2 id="tx-count">All transactions</h2>
             </div>
-            <button class="btn-outline">Export CSV</button>
+            <button class="btn-outline" onclick="exportCSV()">Export CSV</button>
             <button class="btn-add" onclick="openModal()">
               <svg
                 width="14"
@@ -238,18 +351,112 @@
             <h2>Spending by category</h2>
           </div>
           <div class="cat-page-grid" id="cat-page-grid"></div>
+
+          <div class="budget-card">
+            <div class="section-head">
+              <div class="section-bar"></div>
+              <h2>Monthly budget per category</h2>
+            </div>
+            <p class="chart-note left">
+              Your plan for one month. It's compared with what you actually
+              spend in "Planned vs actual" on the Overview.
+            </p>
+            <form class="budget-row" id="budget-form" onsubmit="saveBudgets(event)">
+              <!-- inputs are added by app.js, one per category -->
+              <button type="submit" class="btn-dark">Save budgets</button>
+              <span class="budget-status" id="b-status"></span>
+            </form>
+          </div>
+          <!-- BUDGET PROGRESS: how much of each budget is used this month -->
           <div class="chart-wrap">
             <div class="section-head">
               <div class="section-bar"></div>
-              <h2>Breakdown</h2>
+              <h2 id="progress-title">Budget used this month</h2>
             </div>
-            <div class="chart-card">
-              <div class="chart-canvas-wrap">
-                <canvas id="pie-chart-2"></canvas>
-              </div>
-              <div class="chart-legend" id="chart-legend-2"></div>
+            <div class="progress-card" id="budget-progress"></div>
+          </div>
+        </div>
+
+        <!-- ASSISTANT PAGE (AI chatbot) -->
+        <div class="page" id="page-assistant">
+          <div class="assistant-head">
+            <div class="assistant-avatar large"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg></div>
+            <div>
+              <h1 class="page-title">Budget assistant</h1>
+              <p class="chat-hint">
+                Ask about your spending. Answers come from your real
+                transactions. Not financial advice.
+              </p>
             </div>
           </div>
+
+          <!-- MY BUDGET: incomes and savings goals are two independent lists -->
+          <form class="budget-card" onsubmit="saveProfile(event)">
+            <div class="section-head">
+              <div class="section-bar"></div>
+              <h2>My budget</h2>
+            </div>
+
+            <div class="money-lists">
+              <div class="money-list">
+                <div class="money-list-head">
+                  <span class="filter-label">Incomes (per month)</span>
+                  <span class="money-total" id="income-total"></span>
+                </div>
+                <div id="income-rows"></div>
+                <button type="button" class="btn-add-row" onclick="addMoneyRow('income')">+ Add income</button>
+              </div>
+
+              <div class="money-list">
+                <div class="money-list-head">
+                  <span class="filter-label">Savings goals</span>
+                  <span class="money-total" id="goal-total"></span>
+                </div>
+                <div id="goal-rows"></div>
+                <button type="button" class="btn-add-row" onclick="addMoneyRow('goal')">+ Add goal</button>
+              </div>
+            </div>
+
+            <div class="money-actions">
+              <button type="submit" class="btn-dark">Save</button>
+              <span class="budget-status" id="p-status"></span>
+            </div>
+          </form>
+
+          <div class="chat-suggestions">
+            <button class="chip" onclick="askSuggestion(this)">Where does my money go?</button>
+            <button class="chip" onclick="askSuggestion(this)">What should I cut to save $200 a month?</button>
+            <button class="chip" onclick="askSuggestion(this)">How much can I save in 6 months?</button>
+            <button class="chip" onclick="askSuggestion(this)">When will I reach my goals?</button>
+            <button class="chip" onclick="askSuggestion(this)">Which budgeting strategy fits me?</button>
+          </div>
+
+          <div class="chat-card">
+            <div class="chat-messages" id="chat-messages"></div>
+            <form class="chat-form" onsubmit="sendChat(event)">
+              <input
+                type="text"
+                id="chat-input"
+                class="field-input"
+                placeholder="e.g. How much did I spend on food in September?"
+                autocomplete="off"
+              />
+              <button type="submit" class="btn-dark" id="chat-send">Send</button>
+            </form>
+          </div>
+
+          <!-- LEARN: budgeting strategies the user can discover -->
+          <section class="learn">
+            <div class="section-head">
+              <div class="section-bar"></div>
+              <h2>Learn budgeting strategies</h2>
+            </div>
+            <p class="chart-note left">
+              Proven methods in plain language. Tap one to read it, then ask the
+              assistant how it applies to your own spending.
+            </p>
+            <div class="learn-grid" id="learn-grid"></div>
+          </section>
         </div>
       </main>
     </div>
@@ -257,7 +464,7 @@
     <!-- MODAL -->
     <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
       <div class="modal">
-        <div class="modal-title">Add transaction</div>
+        <div class="modal-title" id="modal-title">Add transaction</div>
         <div class="modal-fields">
           <div>
             <label class="field-label">Description</label>
@@ -296,7 +503,7 @@
         </div>
         <div class="modal-actions">
           <button class="btn-outline" onclick="closeModal()">Cancel</button>
-          <button class="btn-dark" onclick="addTransaction()">Add</button>
+          <button class="btn-dark" id="modal-save" onclick="saveTransaction()">Add</button>
         </div>
       </div>
     </div>

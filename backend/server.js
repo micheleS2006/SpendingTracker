@@ -1,10 +1,14 @@
-const { categorizeTransactions } = require("./categorizer");
 const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2");
 const multer = require("multer");
 const pdfParse = require("pdf-parse/lib/pdf-parse.js");
 require("dotenv").config();
+const { categorizeTransactions } = require("./categorizer");
+const { extractTransactions } = require("./extractor");
+const { getCategory } = require("./rules");
+const { askChatbot } = require("./chatbot");
+const { STRATEGIES } = require("./strategies");
 
 const app = express();
 
@@ -22,61 +26,53 @@ const db = mysql.createPool({
   ssl: process.env.DB_CA_CERT ? { ca: process.env.DB_CA_CERT } : undefined
 });
 
+// Incomes and savings goals: two independent lists (created automatically,
+// locally and on Aiven). A one-time step moves the old single income/goal over.
+async function setupProfileTables() {
+  const q = (sql, params) => db.promise().query(sql, params);
+  try {
+    await q(`CREATE TABLE IF NOT EXISTS incomes (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      amount DECIMAL(10,2) NOT NULL
+    )`);
+    await q(`CREATE TABLE IF NOT EXISTS goals (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      amount DECIMAL(10,2) NOT NULL
+    )`);
+
+    // Old version stored one income and one goal in "profile": copy them once
+    const [old] = await q("SHOW TABLES LIKE 'profile'");
+    if (old.length) {
+      const [[p]] = await q("SELECT * FROM profile WHERE id = 1");
+      const [[{ n }]] = await q("SELECT COUNT(*) AS n FROM incomes");
+      const [[{ g }]] = await q("SELECT COUNT(*) AS g FROM goals");
+      if (p && p.monthly_income && n === 0) await q("INSERT INTO incomes (name, amount) VALUES (?, ?)", ["Main income", p.monthly_income]);
+      if (p && p.goal_amount && g === 0) await q("INSERT INTO goals (name, amount) VALUES (?, ?)", [p.goal_name || "Savings goal", p.goal_amount]);
+      await q("DROP TABLE profile");
+    }
+  } catch (err) {
+    console.error("Could not set up incomes/goals tables:", err.message);
+  }
+}
+setupProfileTables();
+
+// Monthly budget per category, for "planned vs actual"
+db.query(
+  `CREATE TABLE IF NOT EXISTS budgets (
+    category VARCHAR(100) PRIMARY KEY,
+    amount DECIMAL(10,2) NOT NULL
+  )`,
+  (err) => {
+    if (err) console.error("Could not create budgets table:", err.message);
+  }
+);
+
+const CATEGORIES = ["Food & dining", "Transport", "Shopping", "Entertainment", "Other"];
 
 function parseAmount(value) {
   return Number(value.replace(/\s/g, "").replace(",", "."));
-}
-
-function getCategory(desc) {
-  const d = desc.toLowerCase();
-
-  if (
-    d.includes("tim hortons") ||
-    d.includes("mcdonald") ||
-    d.includes("kfc") ||
-    d.includes("subway") ||
-    d.includes("starbucks") ||
-    d.includes("sushi") ||
-    d.includes("burger") ||
-    d.includes("pizza") ||
-    d.includes("pretzel") ||
-    d.includes("tiger sugar") ||
-    d.includes("poulet rouge") ||
-    d.includes("jugo juice") ||
-    d.includes("van houtte") ||
-    d.includes("3 brasseurs")
-  ) {
-    return "Food & dining";
-  }
-
-  if (
-    d.includes("uber") ||
-    d.includes("chrono") ||
-    d.includes("rem station")
-  ) {
-    return "Transport";
-  }
-
-  if (
-    d.includes("amazon") ||
-    d.includes("dollarama") ||
-    d.includes("miniso") ||
-    d.includes("etsy") ||
-    d.includes("jean coutu") ||
-    d.includes("magasins")
-  ) {
-    return "Shopping";
-  }
-
-  if (
-    d.includes("netflix") ||
-    d.includes("spotify") ||
-    d.includes("ceramic cafe")
-  ) {
-    return "Entertainment";
-  }
-
-  return "Other";
 }
 
 function parseRBCTransactions(text) {
@@ -240,21 +236,25 @@ app.post("/transactions", (req, res) => {
   });
 });
 
-// app.delete("/transactions", (req, res) => {
-//   const sql = "DELETE FROM transactions";
+// Delete ALL transactions. Requires { "confirm": true } in the body,
+// so it can't be triggered by accident with an empty request.
+app.delete("/transactions", (req, res) => {
+  if (!req.body || req.body.confirm !== true) {
+    return res.status(400).json({ error: "Missing confirmation." });
+  }
 
-//   db.query(sql, (err) => {
-//     if (err) {
-//       return res.status(500).json({
-//         error: err.message
-//       });
-//     }
+  db.query("DELETE FROM transactions", (err) => {
+    if (err) {
+      return res.status(500).json({
+        error: err.message
+      });
+    }
 
-//     res.json({
-//       message: "All transactions deleted"
-//     });
-//   });
-// });
+    res.json({
+      message: "All transactions deleted"
+    });
+  });
+});
 
 app.delete("/transactions/:id", (req, res) => {
   const id = req.params.id;
@@ -324,25 +324,40 @@ app.post("/upload", upload.single("pdf"), async (req, res) => {
 
     // there is no file on disk to delete
 
-    const parsedTransactions = parseRBCTransactions(pdfData.text);
+    // 1. Try the fast rule-based RBC parser first
+    let parsedTransactions = parseRBCTransactions(pdfData.text);
+    let source = "rules";
+
+    // 2. If it found nothing (other bank or other layout), let the AI read the PDF
+    if (parsedTransactions.length === 0) {
+      console.log("RBC parser found nothing, trying AI extraction...");
+      parsedTransactions = (await extractTransactions(pdfData.text)).map(t => ({
+        ...t,
+        category: getCategory(t.description) // fallback category, AI may replace it
+      }));
+      source = "ai";
+    }
 
     if (parsedTransactions.length === 0) {
       return res.status(400).json({
-        error: "No RBC transactions found in this PDF."
+        error: "Could not find any transactions in this PDF."
       });
     }
 
+    console.log(`Extracted ${parsedTransactions.length} transactions using ${source}`);
+
+    // 3. AI categorization, rules stay as the fallback
     const aiCategories = await categorizeTransactions(parsedTransactions);
 
-      let aiCount = 0;
-      parsedTransactions.forEach((t, i) => {
-        if (aiCategories[i]) {
-          t.category = aiCategories[i];
-          aiCount++;
-        }
-      });
+    let aiCount = 0;
+    parsedTransactions.forEach((t, i) => {
+      if (aiCategories[i]) {
+        t.category = aiCategories[i];
+        aiCount++;
+      }
+    });
 
-      console.log(`AI categorized ${aiCount}/${parsedTransactions.length}, rules handled the rest`);
+    console.log(`AI categorized ${aiCount}/${parsedTransactions.length}, rules handled the rest`);
 
     const sql = `
       INSERT INTO transactions
@@ -374,6 +389,134 @@ app.post("/upload", upload.single("pdf"), async (req, res) => {
     res.status(500).json({
       error: err.message
     });
+  }
+});
+
+// Monthly budgets per category ("planned" in planned vs actual)
+app.get("/budgets", (req, res) => {
+  db.query("SELECT category, amount FROM budgets", (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const budgets = {};
+    rows.forEach(r => { budgets[r.category] = Number(r.amount); });
+    res.json(budgets);
+  });
+});
+
+// Body: { "Food & dining": 300, "Transport": 100, ... }  (empty = no budget)
+app.put("/budgets", async (req, res) => {
+  const body = req.body || {};
+
+  const rows = [];
+  for (const category of CATEGORIES) {
+    const value = body[category];
+    if (value === "" || value == null) continue;
+    const amount = Number(value);
+    if (!(amount >= 0 && amount < 1000000)) {
+      return res.status(400).json({ error: `Invalid budget for ${category}.` });
+    }
+    rows.push([category, Math.round(amount * 100) / 100]);
+  }
+
+  try {
+    await db.promise().query("DELETE FROM budgets");
+    if (rows.length) await db.promise().query("INSERT INTO budgets (category, amount) VALUES ?", [rows]);
+    const budgets = {};
+    rows.forEach(([c, a]) => { budgets[c] = a; });
+    res.json(budgets);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// My budget: a list of incomes and a list of savings goals (independent)
+async function readProfile() {
+  const [incomes] = await db.promise().query("SELECT name, amount FROM incomes ORDER BY id");
+  const [goals] = await db.promise().query("SELECT name, amount FROM goals ORDER BY id");
+  const clean = rows => rows.map(r => ({ name: r.name, amount: Number(r.amount) }));
+  const inc = clean(incomes);
+  return {
+    incomes: inc,
+    goals: clean(goals),
+    totalMonthlyIncome: Math.round(inc.reduce((sum, i) => sum + i.amount, 0) * 100) / 100
+  };
+}
+
+app.get("/profile", async (req, res) => {
+  try {
+    res.json(await readProfile());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Body: { incomes: [{ name, amount }], goals: [{ name, amount }] }
+// Replaces both lists. Empty rows are ignored.
+app.put("/profile", async (req, res) => {
+  const body = req.body || {};
+
+  function cleanList(list, label, max) {
+    if (list == null) return [];
+    if (!Array.isArray(list) || list.length > 20) throw new Error(`Invalid ${label} list.`);
+    const out = [];
+    for (const item of list) {
+      const name = typeof item?.name === "string" ? item.name.trim().slice(0, 100) : "";
+      const empty = item?.amount === "" || item?.amount == null;
+      if (!name && empty) continue; // blank row
+      const amount = Number(item.amount);
+      if (empty || !(amount > 0 && amount < max)) throw new Error(`Each ${label} needs a positive amount.`);
+      out.push([name || (label === "income" ? "Income" : "Savings goal"), Math.round(amount * 100) / 100]);
+    }
+    return out;
+  }
+
+  let incomes, goals;
+  try {
+    incomes = cleanList(body.incomes, "income", 1000000);
+    goals = cleanList(body.goals, "goal", 10000000);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  try {
+    await db.promise().query("DELETE FROM incomes");
+    await db.promise().query("DELETE FROM goals");
+    if (incomes.length) await db.promise().query("INSERT INTO incomes (name, amount) VALUES ?", [incomes]);
+    if (goals.length) await db.promise().query("INSERT INTO goals (name, amount) VALUES ?", [goals]);
+    res.json(await readProfile());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Budgeting strategies for the "Learn" section (same list the assistant searches)
+app.get("/strategies", (req, res) => {
+  res.json(STRATEGIES.map(({ keywords, ...s }) => s));
+});
+
+// Budget assistant chatbot (AI + function calling over the user's data)
+app.post("/chat", async (req, res) => {
+  const { messages } = req.body;
+
+  // Validate input: a non-empty list of { role, text }
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: "No message sent." });
+  }
+
+  const history = messages
+    .filter(m => m && typeof m.text === "string" && m.text.trim())
+    .slice(-10) // only the last 10 messages, keeps cost low
+    .map(m => ({ role: m.role === "assistant" ? "assistant" : "user", text: m.text.slice(0, 2000) }));
+
+  if (history.length === 0 || history[history.length - 1].role !== "user") {
+    return res.status(400).json({ error: "The last message must be from the user." });
+  }
+
+  try {
+    const reply = await askChatbot(db, history);
+    res.json({ reply });
+  } catch (err) {
+    console.error("Chatbot failed:", err.message);
+    res.status(503).json({ error: "The assistant is unavailable right now. Please try again." });
   }
 });
 

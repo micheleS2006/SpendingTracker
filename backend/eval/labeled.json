@@ -1,0 +1,92 @@
+[
+  {
+    "description": "ARITZIA",
+    "amount": 76.89,
+    "expected": "Shopping"
+  },
+  {
+    "description": "STM CHRONO",
+    "amount": 3.75,
+    "expected": "Transport"
+  },
+  {
+    "description": "IGA EXTRA",
+    "amount": 58.42,
+    "expected": "Food & dining"
+  },
+  {
+    "description": "UBER EATS",
+    "amount": 27.15,
+    "expected": "Food & dining"
+  },
+  {
+    "description": "PHARMAPRIX",
+    "amount": 19.99,
+    "expected": "Shopping"
+  },
+  {
+    "description": "CINEPLEX",
+    "amount": 16.5,
+    "expected": "Entertainment"
+  },
+  {
+    "description": "ATM withdrawal",
+    "amount": 40.0,
+    "expected": "Other"
+  },
+  {
+    "description": "SAQ",
+    "amount": 32.95,
+    "expected": "Food & dining"
+  },
+  {
+    "description": "BIXI MONTREAL",
+    "amount": 4.25,
+    "expected": "Transport"
+  },
+  {
+    "description": "TIM HORTONS",
+    "amount": 4.5,
+    "expected": "Food & dining"
+  },
+  {
+    "description": "SPOTIFY",
+    "amount": 11.99,
+    "expected": "Entertainment"
+  },
+  {
+    "description": "PROVIGO",
+    "amount": 64.1,
+    "expected": "Food & dining"
+  },
+  {
+    "description": "Transfer sent",
+    "amount": 50.0,
+    "expected": "Other"
+  },
+  {
+    "description": "STEAM GAMES",
+    "amount": 24.99,
+    "expected": "Entertainment"
+  },
+  {
+    "description": "SEPHORA",
+    "amount": 45.0,
+    "expected": "Shopping"
+  },
+  {
+    "description": "UBER TRIP",
+    "amount": 14.8,
+    "expected": "Transport"
+  },
+  {
+    "description": "CAFE OLIMPICO",
+    "amount": 5.75,
+    "expected": "Food & dining"
+  },
+  {
+    "description": "HYDRO QUEBEC",
+    "amount": 62.3,
+    "expected": "Other"
+  }
+]
