@@ -28,7 +28,7 @@ A full-stack expense tracker with AI built in. Upload a bank statement from **an
 ### AI features
 - **Automatic categorization:** every uploaded transaction is categorized by Gemini using structured JSON output, with validation, a retry and a rule-based fallback.
 - **Any bank, any layout:** a fast rule-based parser handles RBC statements; for any other bank or layout, the LLM extracts the transactions from the PDF text.
-- **Budget assistant (AI agent):** a chatbot that decides which tools to call (spending by category, top merchants, monthly totals, budget vs actual, savings projection), runs them on the database, and answers from the results. It replies in French or English.
+- **Budget assistant (AI agent):** a chatbot that decides which tools to call (spending by category, top merchants, monthly totals, budget vs actual, saved incomes and goals, savings projection, budgeting strategies), runs them, and answers from the results. It replies in French or English.
 - **Savings predictions:** projects savings from your incomes and average spending, simulates "what if" cuts, and estimates how long each savings goal would take.
 - **Budgeting strategies (retrieval):** the assistant searches a small knowledge base of proven methods (50/30/20, pay yourself first, envelope method, sinking funds, debt avalanche and snowball...) and explains the relevant one using your real numbers. You can also browse them in the "Learn" section.
 
@@ -50,13 +50,13 @@ A full-stack expense tracker with AI built in. Upload a bank statement from **an
 
 **Privacy.** Only the description, date and amount are sent for categorization. Before a full statement is sent for extraction, every run of 5+ digits (account and card numbers) is masked as `#####`, and the text is capped in length to limit cost.
 
-**Safety of the agent.** The assistant can only call a fixed list of tools, each running a predefined, parameterized SQL query. It never writes SQL itself; unknown tool requests are refused, and the loop stops after 5 rounds.
+**Safety of the agent.** The assistant can only call a fixed list of tools, each running a predefined, parameterized SQL query. It never writes SQL itself, and unknown tool requests are refused. The loop is capped at 6 rounds; if the limit is reached, the model must answer from the data it already collected, with no tools available.
 
 **Math stays in code.** LLMs are unreliable at arithmetic, so savings projections and goal timelines are calculated in `tools.js`. The model only decides when to use them and explains the result. While testing, the assistant once added two numbers itself; the instructions were tightened in response.
 
 **Grounded advice (simple RAG).** When the assistant suggests a budgeting strategy, it first retrieves it from `strategies.js`, a knowledge base written and checked by hand, and builds its explanation from that content instead of inventing advice. Retrieval is keyword-based for now; embeddings and a vector search would be the next step as the knowledge base grows.
 
-**Honest limits.** The assistant is not a financial advisor and says so. It only knows the user's spending, plus the income and goal they save in "My budget".
+**Honest limits.** The assistant is not a financial advisor and says so. It only knows the user's spending, plus the incomes and goals they save in "My budget".
 
 ## Evaluation
 
@@ -90,7 +90,7 @@ This test set is small. The next step is evaluating on a few hundred real transa
 **Assistant** (`POST /chat`)
 1. The question and recent messages go to Gemini with the tool list (`chatbot.js`).
 2. Gemini asks for a tool; the server runs it (`tools.js`) and sends back the result.
-3. This repeats until Gemini writes the final answer (max 5 rounds).
+3. This repeats until Gemini writes the final answer (max 6 rounds, then a forced final answer from the collected data).
 
 ## Project structure
 
