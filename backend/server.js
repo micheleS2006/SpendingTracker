@@ -2,8 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2");
 const multer = require("multer");
-const pdfParse = require("pdf-parse");
-const fs = require("fs");
+const pdfParse = require("pdf-parse/lib/pdf-parse.js");
 require("dotenv").config();
 
 const app = express();
@@ -11,23 +10,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ storage: multer.memoryStorage() });
 
-const db = mysql.createConnection({
+const db = mysql.createPool({
   host: process.env.DB_HOST,
+  port: process.env.DB_PORT || 3306,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
+  database: process.env.DB_NAME,
+  ssl: process.env.DB_CA_CERT ? { ca: process.env.DB_CA_CERT } : undefined
 });
 
-db.connect((err) => {
-  if (err) {
-    console.error("Database connection failed:", err);
-    return;
-  }
-
-  console.log("Connected to MySQL");
-});
 
 function parseAmount(value) {
   return Number(value.replace(/\s/g, "").replace(",", "."));
@@ -246,21 +239,21 @@ app.post("/transactions", (req, res) => {
   });
 });
 
-app.delete("/transactions", (req, res) => {
-  const sql = "DELETE FROM transactions";
+// app.delete("/transactions", (req, res) => {
+//   const sql = "DELETE FROM transactions";
 
-  db.query(sql, (err) => {
-    if (err) {
-      return res.status(500).json({
-        error: err.message
-      });
-    }
+//   db.query(sql, (err) => {
+//     if (err) {
+//       return res.status(500).json({
+//         error: err.message
+//       });
+//     }
 
-    res.json({
-      message: "All transactions deleted"
-    });
-  });
-});
+//     res.json({
+//       message: "All transactions deleted"
+//     });
+//   });
+// });
 
 app.delete("/transactions/:id", (req, res) => {
   const id = req.params.id;
@@ -318,10 +311,17 @@ app.put("/transactions/:id", (req, res) => {
 
 app.post("/upload", upload.single("pdf"), async (req, res) => {
   try {
-    const fileBuffer = fs.readFileSync(req.file.path);
+    // Stop early if no file was sent
+    if (!req.file) {
+      return res.status(400).json({
+        error: "No PDF uploaded."
+      });
+    }
+
+    const fileBuffer = req.file.buffer; //file is in memory now
     const pdfData = await pdfParse(fileBuffer);
 
-    fs.unlinkSync(req.file.path);
+    // there is no file on disk to delete
 
     const parsedTransactions = parseRBCTransactions(pdfData.text);
 
@@ -367,3 +367,5 @@ app.post("/upload", upload.single("pdf"), async (req, res) => {
 app.listen(3000, () => {
   console.log("Server running on http://localhost:3000");
 });
+
+module.exports = app;

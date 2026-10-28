@@ -1,3 +1,4 @@
+const API_URL = "http://localhost:3000";
 const CAT_STYLES = {
   'Food & dining': { color: '#b45309', bg: '#fffbeb', border: '#b45309' },
   'Shopping':      { color: '#dc2626', bg: '#fff0f0', border: '#dc2626' },
@@ -14,7 +15,7 @@ let chart1 = null, chart2 = null;
 let nextId = 13;
 
 async function loadTransactions() {
-  const response = await fetch("http://localhost:3000/transactions");
+  const response = await fetch(`${API_URL}/transactions`);
   const data = await response.json();
 
   transactions = data.map(t => ({
@@ -75,7 +76,7 @@ function resetFilters() {
 async function clearAll() {
   if (!confirm('Clear all transactions?')) return;
 
-  await fetch("http://localhost:3000/transactions", {
+  await fetch(`${API_URL}/transactions`, {
     method: "DELETE"
   });
 
@@ -93,7 +94,7 @@ async function uploadPDF(event) {
   const formData = new FormData();
   formData.append("pdf", file);
 
-  const response = await fetch("http://localhost:3000/upload", {
+  const response = await fetch(`${API_URL}/upload`, {
     method: "POST",
     body: formData
   });
@@ -116,7 +117,7 @@ async function uploadPDF(event) {
 async function deleteTransaction(id) {
 
   await fetch(
-    `http://localhost:3000/transactions/${id}`,
+    `${API_URL}/transactions/${id}`,
     {
       method: "DELETE"
     }
@@ -158,7 +159,7 @@ async function addTransaction() {
 
   if (!desc || isNaN(amt) || amt <= 0 || !date) return;
 
-  const response = await fetch("http://localhost:3000/transactions", {
+  const response = await fetch(`${API_URL}/transactions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
