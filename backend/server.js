@@ -1,3 +1,4 @@
+const { categorizeTransactions } = require("./categorizer");
 const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2");
@@ -330,6 +331,18 @@ app.post("/upload", upload.single("pdf"), async (req, res) => {
         error: "No RBC transactions found in this PDF."
       });
     }
+
+    const aiCategories = await categorizeTransactions(parsedTransactions);
+
+      let aiCount = 0;
+      parsedTransactions.forEach((t, i) => {
+        if (aiCategories[i]) {
+          t.category = aiCategories[i];
+          aiCount++;
+        }
+      });
+
+      console.log(`AI categorized ${aiCount}/${parsedTransactions.length}, rules handled the rest`);
 
     const sql = `
       INSERT INTO transactions

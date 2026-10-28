@@ -1,5 +1,7 @@
-const API_URL = "https://spending-tracker-lime-kappa.vercel.app";
-const CAT_STYLES = {
+const API_URL = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
+  ? "http://localhost:3000"
+  : "https://spending-tracker-lime-kappa.vercel.app";
+  const CAT_STYLES = {
   'Food & dining': { color: '#b45309', bg: '#fffbeb', border: '#b45309' },
   'Shopping':      { color: '#dc2626', bg: '#fff0f0', border: '#dc2626' },
   'Transport':     { color: '#1d4ed8', bg: '#eff4ff', border: '#2563eb' },
