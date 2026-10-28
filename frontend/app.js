@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000";
+const API_URL = "https://spending-tracker-lime-kappa.vercel.app";
 const CAT_STYLES = {
   'Food & dining': { color: '#b45309', bg: '#fffbeb', border: '#b45309' },
   'Shopping':      { color: '#dc2626', bg: '#fff0f0', border: '#dc2626' },
